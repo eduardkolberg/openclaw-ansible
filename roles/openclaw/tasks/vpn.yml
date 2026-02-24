@@ -1,0 +1,60 @@
+---
+# OpenVPN client setup
+#
+# Deploys VPN configuration if roles/openclaw/files/vpn.ovpn exists locally.
+# The .ovpn file is gitignored (contains private keys) — place it at:
+#   roles/openclaw/files/vpn.ovpn
+#
+# Key safety measure: pull-filter blocks redirect-gateway push from the VPN
+# server so that existing SSH/internet routes are not overridden.
+
+- name: Install OpenVPN client
+  ansible.builtin.apt:
+    name: openvpn
+    state: present
+
+- name: Ensure /etc/openvpn/client directory exists
+  ansible.builtin.file:
+    path: /etc/openvpn/client
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Check if VPN config exists locally
+  ansible.builtin.stat:
+    path: "{{ role_path }}/files/vpn.ovpn"
+  register: vpn_config_local
+  delegate_to: localhost
+  become: false
+
+- name: Deploy VPN config to server
+  ansible.builtin.copy:
+    src: vpn.ovpn
+    dest: /etc/openvpn/client/vpn.ovpn
+    owner: root
+    group: root
+    mode: '0600'
+  when: vpn_config_local.stat.exists
+
+- name: Block redirect-gateway (prevents routing all traffic incl. SSH through VPN)
+  ansible.builtin.lineinfile:
+    path: /etc/openvpn/client/vpn.ovpn
+    line: 'pull-filter ignore "redirect-gateway"'
+    state: present
+  when: vpn_config_local.stat.exists
+
+- name: Block DNS override from VPN server
+  ansible.builtin.lineinfile:
+    path: /etc/openvpn/client/vpn.ovpn
+    line: 'pull-filter ignore "dhcp-option"'
+    state: present
+  when: vpn_config_local.stat.exists
+
+- name: Enable and start OpenVPN client service
+  ansible.builtin.systemd:
+    name: openvpn-client@vpn
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: vpn_config_local.stat.exists

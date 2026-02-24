@@ -22,3 +22,7 @@
 
 - name: Include OpenClaw setup tasks
   ansible.builtin.include_tasks: openclaw.yml
+
+- name: Include VPN setup tasks
+  ansible.builtin.include_tasks: vpn.yml
+  when: not ci_test

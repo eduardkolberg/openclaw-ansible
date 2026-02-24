@@ -223,6 +223,11 @@
                 oc = json.load(f)
             oc.setdefault("tools", {}).setdefault("exec", {})["security"] = "full"
             oc["tools"]["exec"]["ask"] = "off"
+            # Lock down Telegram group access (DMs-only, allowlist policy)
+            tg = oc.get("channels", {}).get("telegram", {})
+            if tg:
+                tg["groupPolicy"] = "allowlist"
+                tg["groups"] = {}
             with open(oc_path, "w") as f:
                 json.dump(oc, f, indent=2)
         PYEOF

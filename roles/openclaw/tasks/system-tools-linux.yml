@@ -41,6 +41,8 @@
       # Build essentials for development
       - build-essential
       - file
+      # Database clients
+      - default-mysql-client
     state: present
     update_cache: true
 
