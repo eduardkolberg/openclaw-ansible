@@ -83,6 +83,15 @@
         group: "{{ openclaw_user }}"
         recurse: true
 
+    - name: Replace old home path in all openclaw config files
+      shell: |
+        find {{ openclaw_home }}/.openclaw -type f \( -name "*.json" -o -name "*.cfg" -o -name "*.yml" \) \
+          ! -name "*.bak" \
+          -exec grep -lP "/home/(?!openclaw)[^/]+" {} \; | \
+          xargs -r sed -i "s|/home/[^/]*/\.openclaw|{{ openclaw_home }}/.openclaw|g; \
+                           s|/home/[^/]*/.cache/ms-playwright|{{ openclaw_home }}/.cache/ms-playwright|g"
+      changed_when: true
+
     - name: Enable user lingering (needed for user services to persist without active session)
       command: loginctl enable-linger {{ openclaw_user }}
 
