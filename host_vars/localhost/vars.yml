@@ -1,0 +1,10 @@
+---
+# Server-specific variables for 49.13.52.51 (oc2)
+
+# SSH keys for the openclaw service user
+openclaw_ssh_keys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHTvOrI3ZM4ZdR6dzryBta7IliQ8MfzbklM799FJ9IqZ eduardkolberg@openclaw2-20260224"
+
+# SSH keys for the root user
+root_ssh_keys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHTvOrI3ZM4ZdR6dzryBta7IliQ8MfzbklM799FJ9IqZ eduardkolberg@openclaw2-20260224"

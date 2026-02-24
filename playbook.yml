@@ -74,6 +74,24 @@
       run_once: true
       changed_when: false
 
+    - name: Ensure root .ssh directory exists
+      ansible.builtin.file:
+        path: /root/.ssh
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+      when: root_ssh_keys is defined and root_ssh_keys | length > 0
+
+    - name: Configure authorized SSH keys for root
+      ansible.posix.authorized_key:
+        user: root
+        state: present
+        key: "{{ item }}"
+        exclusive: false
+      loop: "{{ root_ssh_keys | default([]) }}"
+      when: root_ssh_keys is defined and root_ssh_keys | length > 0
+
   roles:
     - openclaw
 

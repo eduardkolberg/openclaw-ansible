@@ -11,5 +11,6 @@ vault.yml
 *.pem
 *.key
 id_rsa*
-host_vars/
-group_vars/
+# host_vars/ and group_vars/ tracked in this fork (public keys only, no secrets)
+# host_vars/
+# group_vars/
