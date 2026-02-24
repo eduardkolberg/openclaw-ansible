@@ -5,8 +5,11 @@
 # The .ovpn file is gitignored (contains private keys) — place it at:
 #   roles/openclaw/files/vpn.ovpn
 #
-# Key safety measure: pull-filter blocks redirect-gateway push from the VPN
-# server so that existing SSH/internet routes are not overridden.
+# Key safety measures:
+# - pull-filter blocks redirect-gateway push so SSH/internet routes are preserved
+# - Static routes added for internal subnets (192.168.101/102) via VPN gateway
+# - /etc/hosts entries ensure VPN-internal hostnames resolve correctly
+#   (VPN DNS gives internal IPs; public DNS gives AWS IPs that don't have MySQL open)
 
 - name: Install OpenVPN client
   ansible.builtin.apt:
@@ -51,10 +54,33 @@
     state: present
   when: vpn_config_local.stat.exists
 
+- name: Add route for internal subnet 192.168.101.0/24 via VPN
+  ansible.builtin.lineinfile:
+    path: /etc/openvpn/client/vpn.ovpn
+    line: 'route 192.168.101.0 255.255.255.0'
+    state: present
+  when: vpn_config_local.stat.exists
+
+- name: Add route for internal subnet 192.168.102.0/24 via VPN
+  ansible.builtin.lineinfile:
+    path: /etc/openvpn/client/vpn.ovpn
+    line: 'route 192.168.102.0 255.255.255.0'
+    state: present
+  when: vpn_config_local.stat.exists
+
 - name: Enable and start OpenVPN client service
   ansible.builtin.systemd:
     name: openvpn-client@vpn
     enabled: true
     state: started
     daemon_reload: true
+  when: vpn_config_local.stat.exists
+
+# VPN DNS resolves arka.media hostnames to internal IPs (192.168.101.x).
+# Since we block dhcp-option pushes, add /etc/hosts entries as fallback.
+- name: Add /etc/hosts entry for maindb.arka.media (VPN internal IP)
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    line: '192.168.101.100 maindb.arka.media'
+    state: present
   when: vpn_config_local.stat.exists
