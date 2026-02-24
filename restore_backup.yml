@@ -109,6 +109,47 @@
       debug:
         msg: "OpenClaw service is {{ service_status.stdout | default('unknown') }}"
 
+    - name: Fix .cache directory ownership (needed for Playwright browser install)
+      file:
+        path: "{{ openclaw_home }}/.cache"
+        owner: "{{ openclaw_user }}"
+        group: "{{ openclaw_user }}"
+        recurse: true
+        state: directory
+
+    - name: Check if Playwright Chromium is installed
+      stat:
+        path: "{{ openclaw_home }}/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome"
+      register: playwright_chrome
+
+    - name: Install Playwright system dependencies (if Chromium not present)
+      command: >
+        node {{ openclaw_home }}/.local/share/pnpm/global/5/.pnpm/playwright-core@1.58.2/node_modules/playwright-core/cli.js
+        install-deps chromium
+      when: not playwright_chrome.stat.exists
+      ignore_errors: true
+
+    - name: Install Playwright Chromium browser (if not present)
+      command: >
+        node {{ openclaw_home }}/.local/share/pnpm/global/5/.pnpm/playwright-core@1.58.2/node_modules/playwright-core/cli.js
+        install chromium
+      become_user: "{{ openclaw_user }}"
+      when: not playwright_chrome.stat.exists
+
+    - name: Fix browser executablePath in openclaw.json (replace old /home/node path)
+      replace:
+        path: "{{ openclaw_home }}/.openclaw/openclaw.json"
+        regexp: '"/home/node/\.cache/ms-playwright'
+        replace: '"{{ openclaw_home }}/.cache/ms-playwright'
+      ignore_errors: true
+
+    - name: Fix .cache ownership after Playwright install
+      file:
+        path: "{{ openclaw_home }}/.cache"
+        owner: "{{ openclaw_user }}"
+        group: "{{ openclaw_user }}"
+        recurse: true
+
     - name: Show restore complete message
       debug:
         msg: |
