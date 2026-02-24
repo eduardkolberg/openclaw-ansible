@@ -17,3 +17,7 @@ id_rsa*
 
 # VPN configs contain private keys - never commit
 roles/openclaw/files/*.ovpn
+
+# Secrets — API keys, tokens (use secrets.yml.example as template)
+host_vars/*/secrets.yml
+group_vars/*/secrets.yml

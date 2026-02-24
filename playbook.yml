@@ -228,8 +228,60 @@
             if tg:
                 tg["groupPolicy"] = "allowlist"
                 tg["groups"] = {}
+            # OpenRouter provider (MiniMax M2.5 as default model)
+            OR_KEY = "{{ openrouter_api_key }}"
+            oc.setdefault("auth", {}).setdefault("profiles", {})["openrouter:manual"] = {
+                "provider": "openrouter", "mode": "token"
+            }
+            oc.setdefault("models", {}).setdefault("providers", {})["openrouter"] = {
+                "baseUrl": "https://openrouter.ai/api/v1",
+                "apiKey": OR_KEY,
+                "api": "openai-responses",
+                "models": [{
+                    "id": "minimax/minimax-m2.5",
+                    "name": "MiniMax M2.5",
+                    "api": "openai-responses",
+                    "input": ["text"],
+                    "contextWindow": 200000,
+                    "maxTokens": 40960
+                }]
+            }
+            oc.setdefault("agents", {}).setdefault("defaults", {})["model"] = {
+                "primary": "openrouter/minimax/minimax-m2.5",
+                "fallbacks": ["openai-codex/gpt-5.3-codex", "anthropic/claude-opus-4-6"]
+            }
             with open(oc_path, "w") as f:
                 json.dump(oc, f, indent=2)
+        PYEOF
+      become: true
+      become_user: "{{ openclaw_user }}"
+      changed_when: true
+
+    - name: Patch agent auth with OpenRouter key (if agent dir exists)
+      ansible.builtin.shell: |
+        python3 - <<'PYEOF'
+        import json, os, time
+        OR_KEY = "{{ openrouter_api_key }}"
+        agent_dir = "{{ openclaw_home }}/.openclaw/agents/main/agent"
+        # auth-profiles.json
+        ap_path = os.path.join(agent_dir, "auth-profiles.json")
+        if os.path.exists(ap_path):
+            with open(ap_path) as f:
+                ap = json.load(f)
+            ap.setdefault("profiles", {})["openrouter:manual"] = {
+                "type": "token", "provider": "openrouter", "token": OR_KEY,
+                "expires": int(time.time() * 1000) + 365 * 24 * 3600 * 1000
+            }
+            with open(ap_path, "w") as f:
+                json.dump(ap, f, indent=2)
+        # auth.json
+        a_path = os.path.join(agent_dir, "auth.json")
+        if os.path.exists(a_path):
+            with open(a_path) as f:
+                a = json.load(f)
+            a["openrouter"] = {"type": "api_key", "key": OR_KEY}
+            with open(a_path, "w") as f:
+                json.dump(a, f, indent=2)
         PYEOF
       become: true
       become_user: "{{ openclaw_user }}"
