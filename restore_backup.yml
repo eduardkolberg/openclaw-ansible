@@ -118,6 +118,33 @@
       debug:
         msg: "OpenClaw service is {{ service_status.stdout | default('unknown') }}"
 
+    - name: Configure exec approvals (no approval required for commands)
+      ansible.builtin.shell: |
+        python3 - <<'PYEOF'
+        import json, os, secrets
+        path = "{{ openclaw_home }}/.openclaw/exec-approvals.json"
+        if os.path.exists(path):
+            with open(path) as f:
+                cfg = json.load(f)
+        else:
+            cfg = {
+                "version": 1,
+                "socket": {
+                    "path": "{{ openclaw_home }}/.openclaw/exec-approvals.sock",
+                    "token": secrets.token_urlsafe(32)
+                },
+                "agents": {}
+            }
+        cfg["defaults"] = {"security": "none", "ask": "off", "askFallback": "allowlist"}
+        for agent in cfg.get("agents", {}).values():
+            agent["security"] = "none"
+            agent["ask"] = "off"
+        with open(path, "w") as f:
+            json.dump(cfg, f, indent=2)
+        PYEOF
+      become: false
+      changed_when: true
+
     - name: Fix .cache directory ownership (needed for Playwright browser install)
       file:
         path: "{{ openclaw_home }}/.cache"
