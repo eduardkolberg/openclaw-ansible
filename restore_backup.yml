@@ -1,0 +1,114 @@
+---
+# OpenClaw Backup Restore Playbook
+#
+# Restores a backup archive to /home/openclaw/.openclaw/
+#
+# Usage (run on the server as root):
+#   ansible-playbook restore_backup.yml -e "backup_path=/tmp/openclaw_backup.tar.gz"
+#
+# The backup archive must already be present on the server at backup_path.
+# Upload it first:
+#   scp -i ~/.ssh/id_rsa openclaw_backup.tar.gz root@<server>:/tmp/
+
+- name: Restore OpenClaw backup
+  hosts: localhost
+  connection: local
+  become: false
+
+  vars:
+    backup_path: "/tmp/openclaw_backup.tar.gz"
+    openclaw_home: "/home/openclaw"
+    openclaw_user: "openclaw"
+    pre_restore_backup: "/tmp/openclaw_pre_restore_{{ ansible_date_time.epoch }}.tar.gz"
+
+  tasks:
+    - name: Verify running as root
+      fail:
+        msg: "This playbook must be run as root"
+      when: ansible_user_id != "root"
+
+    - name: Check backup archive exists
+      stat:
+        path: "{{ backup_path }}"
+      register: backup_stat
+
+    - name: Fail if backup archive not found
+      fail:
+        msg: "Backup archive not found at {{ backup_path }}. Upload it first with: scp openclaw_backup.tar.gz root@{{ ansible_host }}:/tmp/"
+      when: not backup_stat.stat.exists
+
+    - name: Check openclaw user exists
+      getent:
+        database: passwd
+        key: "{{ openclaw_user }}"
+      register: openclaw_user_info
+      ignore_errors: true
+
+    - name: Fail if openclaw user does not exist
+      fail:
+        msg: "User '{{ openclaw_user }}' does not exist. Run the installation playbook first: ./run-playbook.sh"
+      when: openclaw_user_info is failed
+
+    - name: Stop openclaw service
+      systemd:
+        name: openclaw
+        state: stopped
+      ignore_errors: true
+      register: stop_result
+
+    - name: Create pre-restore safety backup (if .openclaw exists)
+      archive:
+        path: "{{ openclaw_home }}/.openclaw"
+        dest: "{{ pre_restore_backup }}"
+        format: gz
+      ignore_errors: true
+      when: ansible_check_mode is not defined
+
+    - name: Show pre-restore backup location
+      debug:
+        msg: "Pre-restore safety backup saved to {{ pre_restore_backup }}"
+      ignore_errors: true
+
+    - name: Extract backup archive to openclaw home
+      unarchive:
+        src: "{{ backup_path }}"
+        dest: "{{ openclaw_home }}"
+        remote_src: true
+        extra_opts:
+          - "--no-same-owner"
+          - "--overwrite"
+
+    - name: Fix ownership on restored .openclaw directory
+      file:
+        path: "{{ openclaw_home }}/.openclaw"
+        owner: "{{ openclaw_user }}"
+        group: "{{ openclaw_user }}"
+        recurse: true
+
+    - name: Start openclaw service
+      systemd:
+        name: openclaw
+        state: started
+        enabled: true
+
+    - name: Wait for openclaw to start
+      pause:
+        seconds: 3
+
+    - name: Check service status
+      systemd:
+        name: openclaw
+      register: service_status
+
+    - name: Show service status
+      debug:
+        msg: "OpenClaw service is {{ service_status.status.ActiveState }}"
+
+    - name: Show restore complete message
+      debug:
+        msg: |
+          ✅ Backup restored successfully!
+          - Restored from: {{ backup_path }}
+          - Restored to:   {{ openclaw_home }}/.openclaw/
+          - Pre-restore safety backup: {{ pre_restore_backup }}
+          - Service status: {{ service_status.status.ActiveState }}
