@@ -49,10 +49,9 @@
         msg: "User '{{ openclaw_user }}' does not exist. Run the installation playbook first: ./run-playbook.sh"
       when: openclaw_user_info is failed
 
-    - name: Stop openclaw service
-      systemd:
-        name: openclaw
-        state: stopped
+    # openclaw uses a user-level systemd service (systemctl --user -M openclaw@)
+    - name: Stop openclaw user service
+      command: systemctl --user -M {{ openclaw_user }}@ stop openclaw-gateway.service
       ignore_errors: true
       register: stop_result
 
@@ -62,7 +61,6 @@
         dest: "{{ pre_restore_backup }}"
         format: gz
       ignore_errors: true
-      when: ansible_check_mode is not defined
 
     - name: Show pre-restore backup location
       debug:
@@ -85,30 +83,37 @@
         group: "{{ openclaw_user }}"
         recurse: true
 
-    - name: Start openclaw service
-      systemd:
-        name: openclaw
-        state: started
-        enabled: true
+    - name: Enable user lingering (needed for user services to persist without active session)
+      command: loginctl enable-linger {{ openclaw_user }}
+
+    - name: Install openclaw daemon (user service) if not already installed
+      command: >
+        systemd-run --user -M {{ openclaw_user }}@
+        /home/{{ openclaw_user }}/.local/share/pnpm/openclaw daemon install
+      ignore_errors: true
+
+    - name: Restart openclaw user service
+      command: systemctl --user -M {{ openclaw_user }}@ restart openclaw-gateway.service
+      ignore_errors: true
 
     - name: Wait for openclaw to start
       pause:
-        seconds: 3
+        seconds: 4
 
     - name: Check service status
-      systemd:
-        name: openclaw
+      command: systemctl --user -M {{ openclaw_user }}@ is-active openclaw-gateway.service
       register: service_status
+      ignore_errors: true
 
     - name: Show service status
       debug:
-        msg: "OpenClaw service is {{ service_status.status.ActiveState }}"
+        msg: "OpenClaw service is {{ service_status.stdout | default('unknown') }}"
 
     - name: Show restore complete message
       debug:
         msg: |
-          ✅ Backup restored successfully!
+          Backup restored successfully!
           - Restored from: {{ backup_path }}
           - Restored to:   {{ openclaw_home }}/.openclaw/
           - Pre-restore safety backup: {{ pre_restore_backup }}
-          - Service status: {{ service_status.status.ActiveState }}
+          - Service status: {{ service_status.stdout | default('unknown') }}
