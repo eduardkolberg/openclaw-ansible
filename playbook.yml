@@ -228,6 +228,10 @@
             if tg:
                 tg["groupPolicy"] = "allowlist"
                 tg["groups"] = {}
+            # WhatsApp read-only (no sending, no broadcasts)
+            wa = oc.get("channels", {}).get("whatsapp", {})
+            if wa:
+                wa.setdefault("actions", {}).update({"send": False, "broadcast": False})
             # OpenRouter provider (MiniMax M2.5 as default model)
             OR_KEY = "{{ openrouter_api_key }}"
             oc.setdefault("auth", {}).setdefault("profiles", {})["openrouter:manual"] = {
