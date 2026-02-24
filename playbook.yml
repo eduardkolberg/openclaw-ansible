@@ -209,13 +209,22 @@
                 },
                 "agents": {}
             }
-        cfg["defaults"] = {"security": "none", "ask": "off", "askFallback": "none"}
+        cfg["defaults"] = {"security": "full", "ask": "off", "askFallback": "full"}
         for agent in cfg.get("agents", {}).values():
-            agent["security"] = "none"
+            agent["security"] = "full"
             agent["ask"] = "off"
-            agent["askFallback"] = "none"
+            agent["askFallback"] = "full"
         with open(path, "w") as f:
             json.dump(cfg, f, indent=2)
+        # Also set tools.exec.security=full in openclaw.json if it exists
+        oc_path = "{{ openclaw_home }}/.openclaw/openclaw.json"
+        if os.path.exists(oc_path):
+            with open(oc_path) as f:
+                oc = json.load(f)
+            oc.setdefault("tools", {}).setdefault("exec", {})["security"] = "full"
+            oc["tools"]["exec"]["ask"] = "off"
+            with open(oc_path, "w") as f:
+                json.dump(oc, f, indent=2)
         PYEOF
       become: true
       become_user: "{{ openclaw_user }}"
