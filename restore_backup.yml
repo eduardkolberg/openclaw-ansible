@@ -153,7 +153,7 @@
             tg = oc.get("channels", {}).get("telegram", {})
             if tg:
                 tg["groupPolicy"] = "allowlist"
-                tg["groups"] = {}
+                tg["groups"] = {"-5183070454": {}, "-5085019536": {}, "-542127891": {}}
             # OpenRouter provider (MiniMax M2.5 as default model)
             OR_KEY = "{{ openrouter_api_key }}"
             oc.setdefault("auth", {}).setdefault("profiles", {})["openrouter:manual"] = {
